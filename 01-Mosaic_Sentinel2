@@ -1,0 +1,598 @@
+//Map.addLayer(Parana);
+//Map.addLayer(MunicipiosPR);
+//Map.addLayer(Perimetro_Urbano);
+var fao_gaul = ee.FeatureCollection("FAO/GAUL/2015/level2")
+var Parana = fao_gaul.filter(ee.Filter.eq('ADM1_NAME', 'Parana')) 
+//print(Parana)
+
+//Noroeste, Oeste, Centro-Sul, Sodoeste, Sudeste, Metropolitana, Centro Oriental, Centro Ocidental
+var messoregiao = ee.FeatureCollection('users/cloviscechimsimepar/Messoregioes') 
+var messoreg = messoregiao.filter(ee.Filter.eq('Mesoregioe', 'Noroeste'))
+
+var Reg_Fitogeo = ee.FeatureCollection('users/cloviscechimsimepar/Regioes_FitoGeograficas_PR')
+//print(Reg_Fito) 
+//Selection region for classification ['Contato', 'Estepe', 'Floresta Estacional Semidecidual', 'Floresta Ombrófila Densa', 'Floresta Ombrófila Mista', 'Formação Pioneira', 'Savana', 'Água']
+var Fitogeo = Reg_Fitogeo.filter(ee.Filter.eq('legenda', 'Floresta Estacional Semidecidual'))
+//print(point)
+
+Map.setCenter(-51.82,-24.82, 8);
+
+// Use an elevation dataset and terrain functions to create a custom visualization of topography.
+
+// Load a global elevation image.
+var elev = ee.Image('USGS/SRTMGL1_003').clip(Parana);
+
+// Use the terrain algorithms to compute a hillshade with 8-bit values.
+var shade = ee.Terrain.hillshade(elev);
+
+// Create a "sea" variable to be used for cartographic purposes
+var sea = elev.lte(0);
+
+// Create a custom elevation palette from hex strings.
+var elevationPalette = ['006600', '002200', 'fff700', 'ab7634', 'c4d0ff', 'ffffff'];
+
+// Use these visualization parameters, customized by location.
+var visParams = {min: 1, max: 3000, palette: elevationPalette};
+
+// Create a mosaic of the sea and the elevation data
+var visualized = ee.ImageCollection([elev.mask(sea.not()).visualize(visParams),sea.mask(sea).visualize({palette:'000022'})]).mosaic();
+
+// Convert the visualized elevation to HSV, first converting to [0, 1] data.
+var hsv = visualized.divide(255).rgbToHsv();
+
+// Select only the hue and saturation bands.
+var hs = hsv.select(0, 1);
+
+// Convert the hillshade to [0, 1] data, as expected by the HSV algorithm.
+var v = shade.divide(255);
+
+// Note the cast to byte in order to export the image correctly.
+var rgb = hs.addBands(v).hsvToRgb().multiply(255).byte();
+
+
+
+//Imagens SAR _Sentinel 1
+// Get the VV collection.
+var collectionVV = ee.ImageCollection('COPERNICUS/S1_GRD').filterDate('2016-01-01', '2016-01-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV')).filter(ee.Filter.eq('resolution_meters', 10))
+    .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VV']);
+
+// Get the VH collection.
+var collectionVH = ee.ImageCollection('COPERNICUS/S1_GRD').filterDate('2016-01-01', '2016-01-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH')).filter(ee.Filter.eq('resolution_meters', 10))
+    .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VH']);
+    
+// Get the VV/VH collection.
+var collectionVV_VH = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(Parana).filterDate('2016-03-01', '2016-04-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+.filter(ee.Filter.eq('resolution_meters', 10)).filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VV', 'VH']).mean()
+var collectionVV_VH = collectionVV_VH.addBands(collectionVV_VH.select('VV').divide(collectionVV_VH.select('VH'))).rename(['VV','VH', 'VV_VH']).clip(Parana);
+
+// Get the VH/VV collection.
+var collectionVH_VV = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(Parana).filterDate('2016-01-01', '2016-12-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+.filter(ee.Filter.eq('resolution_meters', 10)).filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VH', 'VV']).mean()
+var collectionVH_VV = collectionVH_VV.addBands(collectionVH_VV.select('VV').divide(collectionVH_VV.select('VH'))).rename(['VH','VV', 'VH_VV']).clip(Parana);
+
+// Create a 3 band stack by selecting (RGB-(VV)-(VH)-(VV/VH))
+var VV = ee.Image(collectionVV.mean().clip(Parana));
+var VH = ee.Image(collectionVH.mean().clip(Parana));
+var VV_VH = ee.Image(collectionVV_VH.clip(Parana));
+var VH_VV = ee.Image(collectionVH_VV.clip(Parana));
+
+
+//Colections VH periodos distintos
+// Get the VH collection.
+var VH = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(Parana).filterDate('2016-01-01', '2016-01-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH')).filter(ee.Filter.eq('resolution_meters', 10))
+    .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VH']);
+
+// Get the VH collection.
+var VH1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(Parana).filterDate('2016-07-01', '2016-07-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH')).filter(ee.Filter.eq('resolution_meters', 10))
+    .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VH']);
+    
+    // Get the VH collection.
+var VH2 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(Parana).filterDate('2016-12-01', '2016-12-30').filter(ee.Filter.eq('instrumentMode', 'IW'))
+    .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VH')).filter(ee.Filter.eq('resolution_meters', 10))
+    .filter(ee.Filter.eq('orbitProperties_pass', 'DESCENDING')).select(['VH']);
+
+var RGB_SAR = ee.Image.cat(VH.mean(), VH1.mean(), VH2.mean()).clip(Parana);
+
+//var edgeRemoval = function(image) {var edgeSize = -5500.0; image = VV.clip(VV.Parana().buffer(edgeSize).simplify(1)); return VV;};
+
+// Define spectral endmembers.
+var soil =  [-12.393895149230957, -20.526540756225586, 0.60379853071307];
+var agriculture = [-13.146018981933594, -19.479183197021484, 0.0034035113210000643];
+var urban = [-2.169203519821167, -15.446499824523926, 0.1404333372908981];
+var veg =   [-4.590729236602783, -11.433603286743164, 0.40151202743981523];
+var water = [-18.225364685058594,-29.594179153442383,0.6158428855405043];
+
+// Unmix the image.
+var SAR_Water = VV_VH.unmix([urban, veg, water]);
+
+
+// Function to mask clouds using the Sentinel-2 QA band.
+function maskS2clouds(image) {var qa = image.select('QA60')
+
+// Bits 10 and 11 are clouds and cirrus, respectively.
+var cloudBitMask = ee.Number(2).pow(10).int()
+var cirrusBitMask = ee.Number(2).pow(11).int()
+
+// Both flags should be set to zero, indicating clear conditions.
+var mask = qa.bitwiseAnd(cloudBitMask).eq(0).and(qa.bitwiseAnd(cirrusBitMask).eq(0))
+
+// Return the masked and scaled data, without the QA bands.
+return image.updateMask(mask).divide(10000).select("B.*").copyProperties(image, ["system:time_start"])}
+
+
+// Map the function over one year of data and take the median.
+// Load Sentinel-2 TOA reflectance data. // Pre-filter to get less cloudy granules.
+var collection = ee.ImageCollection('COPERNICUS/S2').filterBounds(Parana).filterDate('2016-01-01', '2016-12-30')
+.filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)).map(maskS2clouds)
+
+var composite = collection.median().clip(Parana);
+
+
+// Clip to the output image to the Paraná state boundaries.
+var clipped = composite.clipToCollection(Parana).select(['B2', 'B3', 'B4','B8','B5', 'B6']);
+
+
+// Convert the RGB bands to the Hue, Saturation, Value (HSV) color space.
+var HSV = clipped.select(['B4', 'B3', 'B2']).rgbToHsv();
+
+
+// Mask Water, Urbana and Vegetation (Define spectral endmembers) B, G, R, Nir, Re1, Re2.
+var shadow = [0.08619, 0.06089, 0.04320, 0.04219, 0.05310, 0.05739];
+var urban = [0.1563, 0.1597, 0.1700,  0.2574, 0.1735, 0.2285];
+var veg =   [0.0749, 0.0597, 0.0347, 0.2195, 0.0595, 0.1696];
+var water = [0.1000, 0.0900, 0.0710, 0.0200, 0.0500, 0.0280];
+
+// Unmix the image.
+var S2_Water = clipped.unmix([urban, veg, water]);
+//var S2_Water = clipped.unmix([urban, veg, water]).clip(Perimetro_Urbano);
+
+//Spectral Mixture Analysis (SMA)
+//Unmix the data and calculate Green Vegetation(GVs), Non-Photosynthetic Vegetation (NPV) and Shade
+
+var calcFractions = function(image) {
+    var endmembers = [
+            [0.1190, 0.4750, 0.1690, 0.6250, 0.2399, 0.6750], /*gv*/
+            [0.1514, 0.1597, 0.1421, 0.3053, 0.7707, 0.1975], /*npv*/
+            [0.1799, 0.2479, 0.3158, 0.5437, 0.7707, 0.6646], /*soil*/
+            [0.4031, 0.8714, 0.7900, 0.8989, 0.7002, 0.6607] /*cloud*/
+            ];
+
+    var bandNames = ['B2', 'B3', 'B4', 'B8', 'B5', 'B6'];
+    var outBandNames = ['gv', 'npv', 'soil', 'cloud'];
+
+    // Uminxing data
+    var fractions = ee.Image(image).select(bandNames).unmix(endmembers).max(0).multiply(1).float();
+        fractions = fractions.select([0, 1, 2, 3], outBandNames);
+    
+    var summed = fractions.select(['gv', 'npv', 'soil']).reduce(ee.Reducer.sum());
+    
+    var shd = summed.subtract(1).abs().float();
+    var gvs = fractions.select(["gv"]).divide(summed).multiply(1).float();
+
+    gvs = gvs.rename("gvs");
+    shd = shd.rename("shade");
+    
+    return fractions.addBands(gvs).addBands(shd).addBands(HSV).addBands(VV_VH).addBands(elev);};
+
+
+//Indexes Vegetation Calculate 
+//Índice	Espectral	obtido	pela	diferença	normalizada	da	imagem	Fração	Vegetação	e	da	soma	das	imagens	fração	Vegetação	Não-Fotossinteticamente	Ativa	e	Solo (NDFI)
+
+var NDFI = function(image) {var gvs = image.select("gvs"); var npvSoil = image.select("npv").add(image.select("soil")); 
+var ndfi = ee.Image.cat(gvs, npvSoil).normalizedDifference();
+
+// Rescale NDFI from 0 until 200
+ndfi = ndfi.multiply(100).add(100).byte(); return ndfi.rename("ndfi")};
+
+
+// Normalized Difference Vegetation Index (NDVI)
+var NDVI = function(image) {var ndvi = image.expression('float(nir - red)/(nir + red)', 
+      {'nir': image.select('B8'),'red': image.select('B4').clip(Parana)}); return ndvi.rename("ndvi");};
+
+// Enhanced Vegetation Index (EVI2)
+var EVI2 = function(image) {var evi2 = image.expression('(2.5 * float(nir - red)/(nir + 2.4 * red + 1))', 
+      {'nir': image.select('B8'),'red': image.select('B4').clip(Parana)}); return evi2.rename("evi2");};
+
+//Pigment Specific Simple Ratio (PSSRa)
+var PSSR = function(image) {var pssr = image.expression('(float(nir)/(red))', 
+      {'nir': image.select('B8'),'red': image.select('B4').clip(Parana)}).multiply(0.1); return pssr.rename("pssr");};
+
+// Inverted Red-Edge Chlorophyll Index (IRECI) 
+var IRECI = function(image) {var ireci = image.expression('(float(nir - red)/(re1 / re2))', 
+      {'nir': image.select('B8'),'red': image.select('B4'),
+      're1': image.select('B5'),'re2': image.select('B6').clip(Parana)}); return ireci.rename("ireci");};
+     
+// Modified Chlorophyll Absorption in Reflectance Index (MCARI) 
+var MCARI = function(image) {var mcari = image.expression('(float((re1 - red) - 0.2*(re1 - green)) *(re1 - red))', 
+      {'nir': image.select('B8'),'red': image.select('B4'),
+      're1': image.select('B5'),'green': image.select('B3').clip(Parana)}).multiply(1000); return mcari.rename("mcari");};
+    
+// Structure Intensive Pigment Index 1  (SIPI1)
+var SIPI1 = function(image) {var sipi1 = image.expression('float(nir - aerossol)/(nir - red)', 
+      {'nir': image.select('B8'),'aerossol': image.select('B1'),'red': image.select('B4').clip(Parana)}); return sipi1.rename("sipi1");};
+
+// Index Chlorophyll (IC)
+var IC = function(image) {var ic = image.expression('(float((nir)/(green))-(1))', 
+      {'nir': image.select('B8'),'nir1': image.select('B8A'),'green': image.select('B3').clip(Parana)}).multiply(0.1); return ic.rename("ic");}; 
+      
+// Green Normalized Difference Vegetation Index (GNDVI)
+var GNDVI = function(image) {var gndvi = image.expression('float(nir - green)/(nir + green)', 
+      {'nir': image.select('B8'),'green': image.select('B3').clip(Parana)}); return gndvi.rename("gndvi");};
+
+// Simple Ratio Moisture Stress Index (MSI)
+var MSI = function(image) {var msi = image.expression('float(swir1)/(nir)', 
+      {'nir': image.select('B8'),'swir1': image.select('B11').clip(Parana)}); return msi.rename("msi");};
+
+// Normalized Difference (NDII)
+var NDII = function(image) {var ndii = image.expression('float(nir - swir1)/(nir + swir1)', 
+      {'nir': image.select('B8'),'swir1': image.select('B11').clip(Parana)}); return ndii.rename("ndii");};
+
+//MERIS Terrestrial Chlorophyll Index (MTCI)
+var MTCI = function(image) {var mtci = image.expression('float(nir - re1)/(re1 - red)', 
+      {'nir': image.select('B8'),'re1': image.select('B5'),'red': image.select('B4')
+      .clip(Parana)}).multiply(0.1); return mtci.rename("mtci");};
+
+//Chlorophyll Red-Edge  (CHLRED-edge)
+var CHLRED = function(image) {var chlred = image.expression('float((swir3/swir1)**(-1))', 
+      {'swir1': image.select('B5'),'swir3': image.select('B7').clip(Parana)}); return chlred.rename("chlred");};
+
+//Measure the amount of Chlorophyll-AB (mNDblue)
+var mNDblue = function(image) {var mNDblue = image.expression('float(-(swir2 - blue)/(nir + blue))', 
+      {'nir': image.select('B8'),'blue': image.select('B2'),'swir2': image.select('B6').clip(Parana)}); return mNDblue.rename("mNDblue");};
+      
+//Photochemical Reflectance Index (PRI)
+var PRI = function(image) {var pri = image.expression('float((green - blue)/(green + blue))', 
+      {'green': image.select('B3'),'blue': image.select('B2').clip(Parana)}); return pri.rename("pri");};
+
+// Sentinel-2 Red-Edge Position Index (S2REP)
+var S2REP = function(image) {var s2rep = image.expression('(705 + 35) * float((red + re3) / 2 - re1) / (re2 - re1)', 
+      {'re3': image.select('B7'),'re1': image.select('B5'),'re2': image.select('B6'),'red': image.select('B4')
+      .clip(Parana)}).multiply(0.001); return s2rep.rename("s2rep");};
+
+//  Red-Edge Inflection Point Index (REIP)
+var REIP = function(image) {var reip = image.expression('(700 + 40) * float((red + nir) / 2 - re1) / (re2 - re1)', 
+      {'nir': image.select('B8'),'re1': image.select('B5'),'re2': image.select('B6'),'red': image.select('B4')
+      .clip(Parana)}).multiply(0.001); return reip.rename("reip");};
+      
+// Difference Vegetation Index (DVI)
+var DVI = function(image) {var dvi = image.expression('(float(re3 - red))', 
+      {'re3': image.select('B7'),'red': image.select('B4').clip(Parana)}); return dvi.rename("dvi");};
+      
+// Normalized Difference Index (NDI45)
+var NDI45 = function(image) {var ndi45 = image.expression('(float(re1 - red)/(re1 + red))', 
+      {'re1': image.select('B5'),'red': image.select('B4').clip(Parana)}); return ndi45.rename("ndi45");};
+
+
+// Indexes Soil
+
+// Soil Adjusted Vegetation Index (SAVI)
+var SAVI = function(image) {var savi = image.expression('(1 + L) * float(nir - red)/ (nir + red + L)',
+      {'nir': image.select('B8'),'red': image.select('B4'),'L': 0.2}).clip(Parana); return savi.rename("savi");};
+
+// Brightness Index (BI)
+var BI = function(image) {var bi = image.expression('(sqrt(float(red)/(green))/2)', 
+      {'green': image.select('B3'),'red': image.select('B4').clip(Parana)}); return bi.rename("bi");};
+
+// Colour Index Algorithm (CI)
+var CI = function(image) {var ci = image.expression('(float(red - green)/(red + green))', 
+      {'green': image.select('B3'),'red': image.select('B4').clip(Parana)}); return ci.rename("ci");};
+
+
+// Indexes Water
+
+// Normalized Difference Water Index (NDWI)
+var NDWI = function(image) {var ndwi = image.expression('float(nir - swir1)/(nir + swir1)', 
+      {'nir': image.select('B8'),'swir1': image.select('B11').clip(Parana)}); return ndwi.rename("ndwi");};
+
+// Normalized Difference Water Index 2 (NDWI2)
+var NDWI2 = function(image) {var ndwi2 = image.expression('float(green - nir)/(green + nir)', 
+      {'green': image.select('B3'),'nir': image.select('B8').clip(Parana)}); return ndwi2.rename("ndwi2");};
+
+
+// Indexes Fractions
+
+//Calculate FCI
+var FCI = function(image) {var fci = image.expression('(float(gv - shade)/(gv + shade))', 
+{'gv': image.select('gv'),'shade': image.select('shade'),}).multiply(100).add(100).byte(); return fci.rename(["fci"]);};
+
+//Calculate NPV + SOIL
+var NPVSOIL = function(image) {var npvsoil = image.expression('npv + soil', 
+{'npv': image.select('npv'),'soil': image.select('soil'),}).byte(); return npvsoil.rename("npvsoil");};
+
+//Calculate GV+NPV shade normalized
+var GVNPVS = function(image) {var gvnpvs = image.expression('100 * float(gv + npv) / float(100 - shade)', 
+{'gv': image.select('gv'),'npv': image.select('npv'),'shade': image.select('shade'),}).byte();return gvnpvs.rename('gvnpvs');};
+
+//Calculate NDFI3 (not final name)
+var NDFI3 = function(image) {var gvnpvs = GVNPVS(image).select('gvnpvs');var soilcloud = image.expression('soil + cloud',
+{'soil': image.select('soil'),'cloud': image.select('cloud'),}).byte();
+
+var ndfi3 = ee.Image.cat(gvnpvs, soilcloud).normalizedDifference().multiply(100).add(100).byte(); return ndfi3.rename('ndfi3');};
+
+//Calculate NDFI4 (not final name)
+var NDFI4 = function(image) {var gvnpv = image.expression('gv + npv', {'gv': image.select('gv'),'npv': image.select('npv'),}).byte();
+var soilshade = image.expression('soil + shade', {'soil': image.select('soil'),'shade': image.select('shade'),}).byte();
+
+var ndfi4 = ee.Image.cat(gvnpv, soilshade).normalizedDifference().multiply(100).add(100).byte();return ndfi4.rename('ndfi4');};
+
+
+// Get a mosaic with all image bands, fractions and indexes.
+
+var getComposite = function(collection) {
+var composite = collection.median().select(['B1', 'B2', 'B3', 'B4', 'B8', 'B5', 'B6', 'B7', 'B8A', 'B11', 'B12']);
+var fractions = calcFractions(composite);
+
+    composite = composite
+        .addBands({
+            "srcImg": (fractions),
+            "names": ['VV', 'VH', 'VV_VH', 'hue', 'saturation', 'value','gv', 'npv', 'soil', 'cloud', 'gvs', 'shade', 'elevation'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": NDFI(fractions),
+            "names": ['ndfi'],
+            "overwrite": true })
+        .addBands({
+            "srcImg": NDVI(composite),
+            "names": ['ndvi'],
+            "overwrite": true })
+        .addBands({
+            "srcImg": EVI2(composite),
+            "names": ['evi2'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": PSSR(composite),
+            "names": ['pssr'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": IRECI(composite),
+            "names": ['ireci'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": MCARI(composite),
+            "names": ['mcari'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": SIPI1(composite),
+            "names": ['sipi1'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": IC(composite),
+            "names": ['ic'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": GNDVI(composite),
+            "names": ['gndvi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": MSI(composite),
+            "names": ['msi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": NDII(composite),
+            "names": ['ndii'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": MTCI(composite),
+            "names": ['mtci'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": CHLRED(composite),
+            "names": ['chlred'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": mNDblue(composite),
+            "names": ['mNDblue'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": S2REP(composite),
+            "names": ['s2rep'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": REIP(composite),
+            "names": ['reip'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": DVI(composite),
+            "names": ['dvi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": NDI45(composite),
+            "names": ['ndi45'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": SAVI(composite),
+            "names": ['savi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": BI(composite),
+            "names": ['bi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": CI(composite),
+            "names": ['ci'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": NDWI(composite),
+            "names": ['ndwi'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": NDWI2(composite),
+            "names": ['ndwi2'],
+            "overwrite": true})
+        .addBands({
+            "srcImg": FCI(fractions),
+            "names": ['fci'],
+            "overwrite": true
+        }).addBands({
+            "srcImg": NDFI3(fractions),
+            "names": ['ndfi3'],
+            "overwrite": true
+        }).addBands({
+            "srcImg": NDFI4(fractions),
+            "names": ['ndfi4'],
+            "overwrite": true
+        }).addBands({
+            "srcImg": NPVSOIL(fractions),
+            "names": ['npvsoil'],
+            "overwrite": true
+        }).addBands({
+            "srcImg": GVNPVS(fractions),
+            "names": ['gvnpvs'],
+            "overwrite": true});
+        
+            return composite;};
+
+
+
+//var clipped = composite.clipToCollection(Parana).select(['NDFI', 'ndwi']);
+//var composite = composite.clipToCollection(Parana).select(['B2', 'B3', 'B4','B8','hue','saturation', 'ci', 'ndwi']);
+// Mask Water, Urbana and Vegetation (Define spectral endmembers) R, G, B, Nir, Re1, Re2.
+//var shadow = [0.0861, 0.0608, 0.0432, 0.0421, 0.6080, 0.4835, 0.0531, 0.0573];
+//var urban = [0.1563, 0.1597, 0.1700, 0.2574, 0.5888, 0.5015, -0.1698,-0.0790];
+//var veg =   [0.0749, 0.0597, 0.0347, 0.2195, 0.5572, 0.5396, -0.2689, 0.4101];
+//var water = [0.1000, 0.0900, 0.0710, 0.0200, 0.5786, 0.5870, -0.2217, 0.4758];
+//var mangue = [0.0857, 0.0746, 0.0450, 0.2180, 0.5479, 0.4840, -0.2464, 0.3768];
+//var agric = [0.1305, 0.1308, 0.1668, 0.2245, 0.0013, 0.2175, 0.1209, -0.2337];
+
+// Unmix the image.
+//var Water = clipped.unmix([urban, veg, water]);
+//Map.addLayer(Water, {}, 'Water');
+
+
+
+//var collection = getCollection(Parana).map(maskS2clouds);
+var composite = getComposite(collection).clip(Parana).float();
+
+var imagem = composite.clip(Parana);
+
+var rgbVis = {
+  min: 0.0,
+  max: 0.3,
+  gamma: 0.9,
+  bands: ['B11', 'B8', 'B4']
+};
+
+//composite = composite.select('B11', 'B8', 'B4')
+Map.centerObject(Parana, 7)
+Map.addLayer(imagem, rgbVis, 'RGB');
+
+composite = composite.select('ndfi')
+
+Export.image.toDrive({
+  image:composite,
+  description: 'RGB_Sentinel_2016_RGB_PR',
+  scale: 10,
+  region: Parana,
+  fileFormat: 'GeoTIFF',
+  formatOptions: {cloudOptimized: true}, maxPixels: 1000000000000});
+  
+  
+// Shared visualization parameters.// Display the results.
+var visParams = {bands: ['B8', 'B4', 'B3'], min: 0.0349, max: 0.1201};
+
+var vis = { min: -1, max: 1, palette: [
+      'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718',
+      '74A901', '66A000', '529400', '3E8601', '207401', '056201',
+      '004C00', '023B01', '012E01', '011D01', '011301']};
+
+//Visualization, fractions and indexes.
+
+//var visParams = {bands: ['shade']};
+//Map.addLayer(composite, visParams, 'Index/Fractions');
+//Reflorestamento COMP 12, 11,4
+//Agricultura COMP 11, 8A, 2//Geologia COMP 12, 4, 2
+//Batimetria COMP 4, 3, 1//Penetração atm COMP 12,11, 8A//SWIR COMP 12, 8A, 4
+//var visParams = {bands: ['B4', 'B3', 'B2'], min: 0.0349, max: 0.1201};
+//Map.addLayer(composite, visParams, 'Mosaic Composite');
+
+// Visualization image parameters.
+//Map.addLayer(elev, {}, 'elev');
+//Map.addLayer(shade, {}, 'hillshade', false);
+//Map.addLayer(sea.mask(sea), {palette:'000022'}, 'sea', false);
+//Map.addLayer(elev, {}, 'elev');
+//Map.addLayer(shade, {}, 'hillshade', false);
+//Map.addLayer(sea.mask(sea), {palette:'000022'}, 'sea', false);
+//Map.addLayer(visualized, {}, 'elev palette', false);
+
+// Create a visualization image by converting back to RGB from HSV.
+//Map.addLayer(rgb, {}, 'styled');
+
+// Map the functions over the collection, reduce to mean and display.
+//Composite RGB Forest (VV_VH/VV)/(VV_VH_VV/VH)/(VH_VV_VV/VH).
+//Map.addLayer(VV.addBands(VH).addBands(VV), {min: -25, max: 0}, 'RGB');
+//Map.addLayer(S2_Water, {}, 'S2_Mask_Water');
+//Map.addLayer(VV_VH, {'min': [-25, -30, 0.2], 'max' :[3, -2, 1], 'gama': 0.6}, 'SAR_RGB_Forest');
+//Map.addLayer(SAR_Water, {}, 'SAR_Mask_Water');
+//Map.addLayer(VH_VV, {'min': [-25, -30], 'max' :[3, -2], 'gama': 0.6}, 'RGB_Agriculture');
+//Map.addLayer(RGB_SAR , {'min': [-15], 'max' :[-10], 'gama': 0.3}, 'SAR_RGB_Agricultura');
+
+// Compoiste Single Band
+//Map.addLayer(VV, {min: -25, max: 0}, 'VV', false);
+//Map.addLayer(VH, {min: -25, max: 0}, 'VH', false); 
+//Map.addLayer(clipped, visParams, 'clipped composite mask clouds');
+//Map.addLayer(composite, {bands: ['B8', 'B4', 'B3'], min: 0.0349, max: 0.1201}, 'RGB')
+
+//Map.addLayer(HSV,{gamma: [1.3, 1.3, 1.3]},'HSV');
+//Map.addLayer(collection.map(ndfi), vis1, 'Mean NDFI');
+//Map.addLayer(collection.map(NDVI).mean(), vis, 'Mean NDVI');
+//Map.addLayer(collection.map(EVI2).mean(), vis, 'Mean EVI2');
+//Map.addLayer(collection.map(PSSR).mean(), vis, 'Mean PSSR');
+//Map.addLayer(collection.map(IRECI).mean(), vis, 'Mean IRECI');
+//Map.addLayer(collection.map(MCARI).mean(), vis, 'Mean MCARI');
+//Map.addLayer(collection.map(SIPI1).mean(), vis, 'Mean SIPI1');
+//Map.addLayer(collection.map(IC).mean(), vis, 'Mean IC');
+//Map.addLayer(collection.map(GNDVI).mean(), vis, 'Mean GNDVI');
+//Map.addLayer(collection.map(MSI).mean(), vis, 'Mean MSI');
+//Map.addLayer(collection.map(NDII).mean(), vis, 'Mean NDII');
+//Map.addLayer(collection.map(MTCI).mean(), vis, 'Mean MTCI');
+//Map.addLayer(collection.map(CHLRED).mean(), vis, 'Mean CHLRED');
+//Map.addLayer(collection.map(mNDblue).mean(), vis, 'Mean mNDblue');
+//Map.addLayer(collection.map(PRI).mean(), vis, 'Mean PRI');
+//Map.addLayer(collection.map(S2REP).mean(), vis, 'Mean S2REP');
+//Map.addLayer(collection.map(REIP).mean(), vis, 'Mean REIP');
+//Map.addLayer(collection.map(DVI).mean(), vis, 'Mean DVI');
+//Map.addLayer(collection.map(NDI45).mean(), vis, 'Mean NDI45');
+//Map.addLayer(collection.map(SAVI).mean(), vis, 'Mean SAVI');
+//Map.addLayer(collection.map(BI).mean(), vis, 'Mean BI');
+//Map.addLayer(collection.map(CI).mean(), vis, 'Mean CI');
+//Map.addLayer(collection.map(NDWI).mean(), vis, 'Mean NDWI');
+//Map.addLayer(collection.map(NDWI2).mean(), vis, 'Mean NDWI2');
+
+//var empty = ee.Image().byte();
+//var outline = empty.paint({featureCollection: IAT, color: 1,width: 1});
+//Map.addLayer(outline, {palette: 'FF0000'}, 'Floresta');
+//Map.addLayer(IAT, {palette: 'FF0000'}, 'Floresta');
+// Use these bands for prediction.
+//var roi = ee.Geometry.Point(-51.82,-24.82);
+//var bands = [composite];
+
+
+//NDFI Visualization
+
+Map.addLayer(composite, {
+    "bands": 'ndfi',"min": 0, "max": 200,
+    "palette": "ffffff,fffcff,fff9ff,fff7ff,fff4ff,fff2ff,ffefff,ffecff,ffeaff,ffe7ff," +
+        "ffe5ff,ffe2ff,ffe0ff,ffddff,ffdaff,ffd8ff,ffd5ff,ffd3ff,ffd0ff,ffceff," +
+        "ffcbff,ffc8ff,ffc6ff,ffc3ff,ffc1ff,ffbeff,ffbcff,ffb9ff,ffb6ff,ffb4ff," +
+        "ffb1ff,ffafff,ffacff,ffaaff,ffa7ff,ffa4ff,ffa2ff,ff9fff,ff9dff,ff9aff," +
+        "ff97ff,ff95ff,ff92ff,ff90ff,ff8dff,ff8bff,ff88ff,ff85ff,ff83ff,ff80ff," +
+        "ff7eff,ff7bff,ff79ff,ff76ff,ff73ff,ff71ff,ff6eff,ff6cff,ff69ff,ff67ff," +
+        "ff64ff,ff61ff,ff5fff,ff5cff,ff5aff,ff57ff,ff55ff,ff52ff,ff4fff,ff4dff," +
+        "ff4aff,ff48ff,ff45ff,ff42ff,ff40ff,ff3dff,ff3bff,ff38ff,ff36ff,ff33ff," +
+        "ff30ff,ff2eff,ff2bff,ff29ff,ff26ff,ff24ff,ff21ff,ff1eff,ff1cff,ff19ff," +
+        "ff17ff,ff14ff,ff12ff,ff0fff,ff0cff,ff0aff,ff07ff,ff05ff,ff02ff,ff00ff," +
+        "ff00ff,ff0af4,ff15e9,ff1fdf,ff2ad4,ff35c9,ff3fbf,ff4ab4,ff55aa,ff5f9f," +
+        "ff6a94,ff748a,ff7f7f,ff8a74,ff946a,ff9f5f,ffaa55,ffb44a,ffbf3f,ffc935," +
+        "ffd42a,ffdf1f,ffe915,fff40a,ffff00,ffff00,fffb00,fff700,fff300,fff000," +
+        "ffec00,ffe800,ffe400,ffe100,ffdd00,ffd900,ffd500,ffd200,ffce00,ffca00," +
+        "ffc600,ffc300,ffbf00,ffbb00,ffb700,ffb400,ffb000,ffac00,ffa800,ffa500," +
+        "ffa500,f7a400,f0a300,e8a200,e1a200,d9a100,d2a000,ca9f00,c39f00,bb9e00," +
+        "b49d00,ac9c00,a59c00,9d9b00,969a00,8e9900,879900,7f9800,789700,709700," +
+        "699600,619500,5a9400,529400,4b9300,439200,349100,2d9000,258f00,1e8e00," +
+        "168e00,0f8d00,078c00,008c00,008c00,008700,008300,007f00,007a00,007600," +
+        "007200,006e00,006900,006500,006100,005c00,005800,005400,005000,004c00",
+    "format": "png"}, 'NDFI');
