@@ -1,9 +1,12 @@
-//Map.addLayer(Parana);
-//Map.addLayer(MunicipiosPR);
-//Map.addLayer(Perimetro_Urbano);
+// Classification Supervised of Imagens Sentinel-2 by Machine Learning
+// Autor: Clovis Cechim Junior - Eng. Ambiental, Msc. Eng. Agricola 
+// Data de atualizacao: 16/08/2021
+// Cited: Cechim Junior et al., (2021)
+
 var fao_gaul = ee.FeatureCollection("FAO/GAUL/2015/level2")
 var Parana = fao_gaul.filter(ee.Filter.eq('ADM1_NAME', 'Parana')) 
 //print(Parana)
+//Map.addLayer(Parana);
 
 //Noroeste, Oeste, Centro-Sul, Sodoeste, Sudeste, Metropolitana, Centro Oriental, Centro Ocidental
 var messoregiao = ee.FeatureCollection('users/cloviscechimsimepar/Messoregioes') 
