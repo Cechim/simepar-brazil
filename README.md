@@ -3,4 +3,4 @@ This repository organizes the Mapped codes for Machine Learning in GEE
 
 Requisites:
 
-Google Earth Engine
+Google Earth Engine (GEE)
